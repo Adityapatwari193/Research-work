@@ -93,3 +93,58 @@ print("Meta-Learner Classification Report:")
 print(classification_report(y_test, y_pred_meta))
 accuracy = accuracy_score(y_test, y_pred_meta)
 print("Meta-Learner Accuracy:", accuracy)
+
+# Manual sample input
+manual_sample = pd.DataFrame({
+    'gender': ['Female'],
+    'SeniorCitizen': [0],
+    'Partner': ['Yes'],
+    'Dependents': ['No'],
+    'tenure': [28],
+    'PhoneService': ['Yes'],
+    'MultipleLines': ['Yes'],
+    'InternetService': ['Fiber optic'],
+    'OnlineSecurity': ['No'],
+    'OnlineBackup': ['No'],
+    'DeviceProtection': ['Yes'],
+    'TechSupport': ['Yes'],
+    'StreamingTV': ['Yes'],
+    'StreamingMovies': ['Yes'],
+    'Contract': ['Month-to-month'],
+    'PaperlessBilling': ['Yes'],
+    'PaymentMethod': ['Electronic check'],
+    'MonthlyCharges': [104.8],
+    'TotalCharges': [3046.05]
+})
+
+# Preprocess the manual sample
+def preprocess_manual_sample(df):
+    df['TotalCharges'] = pd.to_numeric(df['TotalCharges'], errors='coerce').fillna(0)
+    label_encoder = LabelEncoder()
+    categorical_columns = df.select_dtypes(include=['object']).columns
+    for col in categorical_columns:
+        df[col] = label_encoder.fit_transform(df[col])
+    scaler = StandardScaler()
+    numerical_columns = df.select_dtypes(include=[np.number]).columns
+    df[numerical_columns] = scaler.fit_transform(df[numerical_columns])
+    return df
+
+manual_sample_processed = preprocess_manual_sample(manual_sample)
+
+# Reshape manual input data for LSTM
+X_manual_lstm = manual_sample_processed.values.reshape((manual_sample_processed.shape[0], 1, manual_sample_processed.shape[1]))
+
+# Generate predictions from LSTM and XGBoost models for the manual input
+y_pred_prob_lstm_manual = lstm_model.predict(X_manual_lstm)
+y_pred_prob_xgb_manual = xgb_model.predict_proba(manual_sample_processed)[:, 1]  # Probability of class 1
+
+# Stack the predictions as new features for the meta-learner
+X_manual_stacked = np.column_stack((y_pred_prob_lstm_manual.flatten(), y_pred_prob_xgb_manual))
+
+# Predict with the meta-learner for the manual input
+y_pred_meta_manual = meta_learner.predict(X_manual_stacked)
+
+# Output the prediction for the manual input
+predicted_churn_manual = 'Yes' if y_pred_meta_manual[0] == 1 else 'No'
+print("Predicted Churn for the manual input:", predicted_churn_manual)
+
